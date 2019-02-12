@@ -1,0 +1,198 @@
+on *:load: {
+  writeini $qt($scriptdiraway+.ini) settings nick $+($me,|away)
+  writeini $qt($scriptdiraway+.ini) settings method say
+  writeini $qt($scriptdiraway+.ini) settings methodx all
+  writeini $qt($scriptdiraway+.ini) settings awaymsg away: <message>
+  writeini $qt($scriptdiraway+.ini) settings retmsg returned: <message> - duration: <awaytime>
+
+  set %away+.max 0
+
+  echo -ag > Away System wurde geladen.
+  echo -ag > Zum aufrufen des Dialogs: /away+ oder Rechtsklick im Channel auf Away System
+  echo -ag > by Nimes` - Version: 1.0.9-13112010
+}
+
+on *:unload: {
+  unset %away+*
+  .remove $qt($scriptdiraway+.ini)
+  echo -ag > Away System wurde erfolgreich entladen.
+}
+
+menu channel,status {
+  Away System:away+
+}
+
+alias away+ { dialog $iif($dialog(away+),-v,-m) away+ away+ }
+
+dialog away+ {
+  title "Away System"
+  size -1 -1 196 130
+  option dbu
+  text "Grund", 1, 7 6 38 8
+  button "Schließen", 4, 153 18 37 11, cancel
+  button "", 5, 136 18 16 11
+  button "", 6, 46 18 41 11
+  text "Away msg", 7, 7 40 28 8
+  edit "", 8, 46 39 142 10, autohs
+  text "Zurück msg", 10, 7 50 28 8
+  edit "", 11, 46 49 142 10, autohs
+  text "Methode", 12, 7 74 25 8
+  radio "/say", 13, 46 72 23 10, group
+  radio "/me", 14, 46 81 22 10
+  radio "Auf aktivem Netzwerk", 17, 77 72 62 10, group
+  radio "Auf allen Netzwerken", 18, 77 81 62 10
+  text "Away nick", 15, 7 60 25 8
+  edit "", 16, 46 59 68 10, autohs center
+  box "Tags", 19, 144 71 50 32
+  text "<awaytime>", 20, 153 89 33 8
+  text "<message>", 21, 153 80 33 8
+  text "by Nimes`", 3, 168 115 25 8, disable
+  combo 2, 47 5 146 50, sort edit drop
+  check "Highlights anzeigen", 24, 46 96 59 10
+  text "Sonstiges", 26, 7 97 25 8
+  check "Alle Queries automatisch schließen", 9, 46 106 96 10
+}
+
+on *:dialog:away+:*:*: {
+  if ($devent == init) { away+.load }
+  elseif ($devent == edit) {
+    if ($did == 8) { writeini $qt($scriptdiraway+.ini) settings awaymsg $did(8).text }
+    elseif ($did == 11) { writeini $qt($scriptdiraway+.ini) settings retmsg $did(11).text }
+    elseif ($did == 16) { writeini $qt($scriptdiraway+.ini) settings nick $did(16).text }
+  }
+  elseif ($devent == sclick) {
+    if ($did == 6) {
+      if ($away) { $away+.set(cmd).re }
+      else { $away+.set(cmd).aw }
+    }
+    elseif ($did == 5) {
+      if (%away+.max == 0) {
+        dialog -bs $dname -1 -1 198 125
+        set %away+.max 1
+        did -a $dname 5 <
+      }
+      elseif (%away+.max == 1) {
+        dialog -bs $dname -1 -1 198 33
+        set %away+.max 0
+        did -a $dname 5 >
+      }
+    }
+    elseif ($did == 13) { writeini $qt($scriptdiraway+.ini) settings method say }
+    elseif ($did == 14) { writeini $qt($scriptdiraway+.ini) settings method me }
+    elseif ($did == 17) { writeini $qt($scriptdiraway+.ini) settings methodx active }
+    elseif ($did == 18) { writeini $qt($scriptdiraway+.ini) settings methodx all }
+    elseif ($did == 24) { writeini $qt($scriptdiraway+.ini) settings highlight $did(24).state }
+    elseif ($did == 9) { writeini $qt($scriptdiraway+.ini) settings cquery $did(9).state }
+  }
+}
+
+on *:text:*:#: {
+  if (($me isin $1-) && ($away) && ($readini($qt($scriptdiraway+.ini),settings,highlight))) {
+    if (!$window(@Awaypager. $+ $network)) { window -n1k0 @Awaypager. $+ $network }
+    aline -h @Awaypager. $+ $network $timestamp $+(<,$nick,:,$chan,>) $1-
+  }
+}
+
+on *:action:*:#: {
+  if (($me isin $1-) && ($away) && ($readini($qt($scriptdiraway+.ini),settings,highlight))) {
+    if (!$window(@Awaypager. $+ $network)) { window -n1k0 @Highlight. $+ $network }
+    aline -hc $color(action text) @Awaypager. $+ $network $timestamp * $+($nick,:,$chan) $1-
+  }
+}
+
+on *:open:?:*: {
+  if (($away) && ($readini($qt($scriptdiraway+.ini),settings,cquery))) { close -m $nick }
+}
+
+alias -l away+.load {
+  if (%away+.max == 1) {
+    dialog -bs $dname -1 -1 198 125
+    did -ra $dname 5 <
+  }
+  else {
+    dialog -bs $dname -1 -1 198 33
+    did -ra $dname 5 >
+  }
+  if ($away) {
+    dialog -t $dname Away System (Away seit: $duration($awaytime) $+ )
+    did -a $dname 6 Zurück
+  }
+  else {
+    dialog -t $dname Away System (Online)
+    did -a $dname 6 Away
+  }
+  if ($readini($qt($scriptdiraway+.ini),settings,method) == say) { did -c $dname 13 }
+  elseif ($readini($qt($scriptdiraway+.ini),settings,method) == me) { did -c $dname 14 }
+  if ($readini($qt($scriptdiraway+.ini),settings,methodx) == active) { did -c $dname 17 }
+  elseif ($readini($qt($scriptdiraway+.ini),settings,methodx) == all) { did -c $dname 18 }
+  if ($readini($qt($scriptdiraway+.ini),settings,highlight) == 1) { did -c $dname 24 }
+  if ($readini($qt($scriptdiraway+.ini),settings,cquery) == 1) { did -c $dname 9 }
+
+  did -a $dname 8 $readini($qt($scriptdiraway+.ini),settings,awaymsg)
+  did -a $dname 11 $readini($qt($scriptdiraway+.ini),settings,retmsg)
+  did -a $dname 16 $readini($qt($scriptdiraway+.ini),settings,nick)
+
+  var %i = 1
+  while (%i <= $ini($qt($scriptdiraway+.ini),reasons,0)) {
+    did -a $dname 2 $readini($qt($scriptdiraway+.ini),reasons,$ini($qt($scriptdiraway+.ini),reasons,%i))
+    inc %i
+  }
+}
+alias -l away+.set {
+  if ($1 == cmd) {
+    if ($prop == aw) {
+      if (!$did(2).text) { noop $input(Bitte gib einen Grund für deine Abwesenheit an.,ow,Information) | halt }
+      away+.setnicks
+      dialog -t away+ Away System (Abwesend)
+      if (!$away+.isreason($did(2).text)) { writeini $qt($scriptdiraway+.ini) reasons $ticks $did(2).text }
+      if ($readini($qt($scriptdiraway+.ini),settings,method) == say) {
+        return $iif($readini($qt($scriptdiraway+.ini),settings,methodx) == all,scon -a amsg,amsg) $replace($did(8).text,<message>,$did(2).text)
+      }
+      else { return $iif($readini($qt($scriptdiraway+.ini),settings,methodx) == all,scon -a ame,ame) $replace($did(8).text,<message>,$did(2).text) }
+    }
+    elseif ($prop == re) {
+      away+.setback
+      dialog -t away+ Away System (Online)
+      if ($readini($qt($scriptdiraway+.ini),settings,method) == say) {
+        return $iif($readini($qt($scriptdiraway+.ini),settings,methodx) == all,scon -a amsg,amsg) $replace($did(11).text,<message>,$awaymsg,<awaytime>,$duration($awaytime))
+      }
+      else { return $iif($readini($qt($scriptdiraway+.ini),settings,methodx) == all,scon -a ame,ame) $replace($did(11).text,<message>,$awaymsg,<awaytime>,$duration($awaytime)) }   
+    }
+  }
+}
+
+alias -l away+.setnicks {
+  did -a $dname 6 Zurück
+  var %i = $scon(0)
+  while (%i) {
+    scon %i
+    set %away+.nick. [ $+ [ $network ] ] $me
+    nick $did(16).text
+    away $did(2).text
+    dec %i
+  }
+  scon -r
+}
+
+alias -l away+.setback {
+  did -a $dname 6 Away
+  var %i = $scon(0)
+  while (%i) {
+    scon %i
+    nick %away+.nick. [ $+ [ $network ] ]
+    away
+    dec %i
+    unset %away+.nick. [ $+ [ $network ] ]
+  }
+  scon -r
+}
+
+alias -l away+.isreason {
+  var %i = 1
+  while (%i <= $ini($qt($scriptdiraway+.ini),reasons,0)) {
+    if ($1- == $readini($qt($scriptdiraway+.ini),reasons,$ini($qt($scriptdiraway+.ini),reasons,%i))) {
+      return $true
+    }
+    inc %i
+  }
+}
